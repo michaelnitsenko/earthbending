@@ -14,6 +14,11 @@
 		var controls;
 
 		var renderer, scene, camera;
+		var map;
+		var mapWidth = 10;
+		var mapHeight = 10;
+		var maxTerrainHeight = 100;
+
 		var terrain, terrainObj;
 		var obj;
 
@@ -36,47 +41,41 @@
 		function onLoad() {
 			var canvasContainer = document.getElementById('myCanvasContainer');
 
-			cubeVertexShader = document.getElementById('vertexShader').textContent;
-			cubeFragmentShader = document.getElementById('fragmentShader').textContent;
-
 			renderer = new THREE.WebGLRenderer();
 			renderer.setSize(width, height);
 			canvasContainer.appendChild(renderer.domElement);
 
+			genMap();
+
 			scene = new THREE.Scene();
-
-			camera = new THREE.PerspectiveCamera(fov, width / height, 1, 1000);
-			camera.position.y = 100;
-			camera.up = new THREE.Vector3(0, 0, -1);
-			camera.lookAt(new THREE.Vector3(0, 0, 0));
-			scene.add(camera);
-
-			controls = new THREE.OrbitControls(camera);
-
+			addCamera();
+			addLight();
 			addTerrain();
 
 			draw();
 		}
 
-		var splitted = false;
+		function genMap() {
+			map = [];
+			var middleTerrainHeight = maxTerrainHeight / 2;
+			for (var i = 0; i < mapWidth; i++) {
+				var row = [];
+				for (var j = 0; j < mapHeight; j++) {
+					row.push(middleTerrainHeight);
+				}
+				map.push(row)
+			}
+		}
+
 		function parseControls(dt) {
 			if (keyboard.pressed("left")) {
-				if (!splitted) {
-					splitted = true
-					obj = splitTerrain()
-					console.log("split")
-				}
-			}
 
-			if (splitted) {
-				if (keyboard.pressed("up")) {
-					console.log("up")
-					obj.position.y += 1;
-				}
-				if (keyboard.pressed("down")) {
-					console.log("down")
-					obj.position.y -= 1;
-				}
+			}
+			if (keyboard.pressed("up")) {
+				
+			}
+			if (keyboard.pressed("down")) {
+				
 			}
 		}
 
@@ -94,71 +93,20 @@
 			renderer.render(scene, camera);
 		}
 
-		function splitTerrain() {
-			var vertices = [...terrain.geometry.vertices];
-			var modified_vertices = [...terrain.geometry.vertices];
-			for (var vi in vertices) {
-				var v = vertices[vi];
-				var v4 = new THREE.Vector4(v.x, v.y, v.z, 1);
-				v4.applyMatrix4(terrain.matrixWorld); // going to world coordinate
-				var v3 = new THREE.Vector4(v4.x, v4.y, v4.z);
-				vertices[vi] = v3;
-			}
+		function addCamera() {
+			camera = new THREE.PerspectiveCamera(fov, width / height, 1, 1000);
+			camera.position.z = 10;
+			camera.up = new THREE.Vector3(0, 1, 0);
+			camera.lookAt(new THREE.Vector3(0, 0, 0));
+			scene.add(camera);
 
+			controls = new THREE.OrbitControls(camera);
+		}
 
-			var obj = createCube(0x222222);
-			var objVertices = obj.geometry.vertices;
-
-			obj.scale.set(20, 20, 20);
-			scene.add(obj);
-
-			var faces = [];
-			for (var objVertice_index in objVertices) {
-				var objV3 = objVertices[objVertice_index];
-				var objV4 = new THREE.Vector4(objV3.x, objV3.y, objV3.z, 1);
-				objV4.applyMatrix4(obj.matrixWorld);
-				var objVertice = new THREE.Vector3(objV4.x, objV4.y, objV4.z);
-				console.log(objV3)
-				console.log(objV4)
-				if (objVertice.y === 1) {
-					// on the surface
-					modified_vertices.push(objVertice);
-					
-					var closest_vertices = [...vertices];
-					
-					closest_vertices.sort(function (point1, point2) {
-						var d1 = point1.distanceTo(objVertice)
-						var d2 = point2.distanceTo(objVertice)
-						return d1 > d2 ? 1 : (d1 < d2 ? -1 : 0) 
-					});
-
-					var v1 = closest_vertices[0];
-					var v1i = vertices.indexOf(v1);
-					var v2 = closest_vertices[1];
-					var v2i = vertices.indexOf(v2);
-					var v3 = closest_vertices[2];
-					var v3i = vertices.indexOf(v3);
-					var vlasti = modified_vertices.length - 1;
-
-					// for (var vi in closest_vertices) {
-					// 	var v = closest_vertices[vi];
-					// 	console.log(objVertice.distanceTo(v))
-					// }
-
-					var face1 = new THREE.Face3(v1i, vlasti, v2i);
-					faces.push(face1);
-					var face2 = new THREE.Face3(v2i, vlasti, v1i);
-					faces.push(face2);
-				}
-			}
-
-			terrain.geometry.vertices = modified_vertices;
-			terrain.geometry.faces = faces;
-
-			terrain.geometry.verticesNeedUpdate = true;
-			terrain.geometry.elementsNeedUpdate = true;
-
-			return obj;
+		function addLight() {
+			var light = new THREE.PointLight( 0xff0000, 1, 100 );
+			light.position.set( 50, 50, 50 );
+			scene.add( light );
 		}
 
 		function addTerrain() {
@@ -166,9 +114,6 @@
 			var halfPi = Math.PI / 2;
 
 			terrain = createTerrain();
-			terrain.scale.set(50, 50, 50);
-			terrain.position.set(0, -10, 0);
-			terrain.rotation.set(-halfPi, 0, 0);
 			terrainObj.add(terrain);
 
 			scene.add(terrainObj);
@@ -177,109 +122,84 @@
 		function createTerrain() {
 			var geometry = new THREE.Geometry();
 			geometry.dynamic = true;
+			var vertices = [];
+			var faces = [];
 
-			var vertices = [
-				-1.0, -1.0, 0.0, // 0
-				1.0, -1.0, 0.0, // 1
-				1.0, 1.0, 0.0, // 2
-				-1.0, 1.0, 0.0, // 3
-			];
+			var rowsCount = map.length;
+			var cellsCount = map[0].length;
+			var heightCenter = rowsCount / 2;
+			var widthCenter = cellsCount / 2;
+			for (var rowIndex = 0; rowIndex < rowsCount; rowIndex++) {
+				var row = map[rowIndex];
+				for (var cellIndex = 0; cellIndex < cellsCount; cellIndex++) {
+					var height = row[cellIndex];
+					vertices.push(cellIndex - widthCenter);
+					vertices.push(rowIndex - heightCenter);
+					vertices.push(height);
 
-			var faces = [
-				0, 1, 2,
-				0, 2, 3,
-			];
+					if (rowIndex < rowsCount - 1 && cellIndex < cellsCount - 1) {
+						var index = rowIndex * cellsCount + cellIndex;
+						var index_upper = (rowIndex + 1) * cellsCount + cellIndex;
 
-			var verticesCount = vertices.length;
+						faces.push(index);
+						faces.push(index + 1);
+						faces.push(index_upper);
+
+						faces.push(index + 1);
+						faces.push(index_upper + 1);
+						faces.push(index_upper - 1 + 1);
+					}
+				}
+			}
+
+			var verticesCount = rowsCount * cellsCount * 3;
 			for (i = 0; i < verticesCount; i += 3) {
 				geometry.vertices.push(new THREE.Vector3(
 					vertices[i],
 					vertices[i + 1],
 					vertices[i + 2],
-				))
+				));
 			}
 
 			var facesCount = faces.length;
 			for (i = 0; i < facesCount; i += 3) {
-				geometry.faces.push(new THREE.Face3(
+				var face = new THREE.Face3(
 					faces[i],
 					faces[i + 1],
 					faces[i + 2],
-				))
+				);
+
+				var height1 = vertices[i * 3  + 2];
+				var grayScale1 = height1 / maxTerrainHeight;
+				face.vertexColors[0] = new THREE.Color(grayScale1, grayScale1, grayScale1);
+				var height2 = vertices[(i + 1) * 3  + 2];
+				var grayScale2 = height2 / maxTerrainHeight;
+				face.vertexColors[1] = new THREE.Color(grayScale2, grayScale2, grayScale2);
+				var height3 = vertices[(i + 2) * 3  + 2];
+				var grayScale3 = height3 / maxTerrainHeight;
+				face.vertexColors[2] = new THREE.Color(grayScale3, grayScale3, grayScale3);
+				geometry.faces.push(face);
 			}
 
-			var material = new THREE.MeshBasicMaterial({
-				color: 0x222222
-			});
+			var material = new THREE.MeshBasicMaterial({ vertexColors: THREE.VertexColors });
 			var terrainMesh = new THREE.Mesh(geometry, material);
 
 			return terrainMesh;
 		}
-		function createCube(colorCode) {
-			var geometry = new THREE.BoxGeometry(2, 2, 2);
-			var material = new THREE.MeshBasicMaterial({
-				color: 0x666666
-			});
-			var cube = new THREE.Mesh(geometry, material);
-			cube.position.y = -30.0;
 
-			return cube;
+		function chipTerrain(point) {
+
 		}
 
-		function createBufferCube(colorCode) {
-			var geometry = new THREE.BoxBufferGeometry(2, 2, 2);
-			var darkColor = new THREE.Color(colorCode).multiplyScalar(0.5);
-			var lightColor = new THREE.Color(colorCode);
+		function lowerTerrain(point) {
 
-			var elementsPerVertexCount = 3
-			var verticesPerFace = 4
-			var facesCount = 6
-			var verticesCount = verticesPerFace * facesCount
-			var array = new Float32Array(elementsPerVertexCount * verticesCount)
+		}
 
-			for (var i = 0; i < facesCount; i++) {
-				for (var j = 0; j < verticesPerFace; j++) {
-					var currentVertice = i * (verticesPerFace) + j
-					var k = currentVertice * elementsPerVertexCount
+		function raiseTerrain(point) {
 
-					var x = geometry.attributes.position.array[k]
-					var color = x > 0 ? darkColor : lightColor
-
-					array[k] = color.r
-					array[k + 1] = color.g
-					array[k + 2] = color.b
-				}
-			}
-
-			geometry.addAttribute("vertexColor", new THREE.BufferAttribute(array, elementsPerVertexCount))
-
-			var material = new THREE.ShaderMaterial({
-				vertexShader: cubeVertexShader,
-				fragmentShader: cubeFragmentShader
-			});
-			var cube = new THREE.Mesh(geometry, material);
-			cube.position.y = -30.0;
-
-			return cube;
 		}
 
 	</script>
-	<script id="vertexShader" type="x-shader/x-vertex">
-			attribute vec3 vertexColor;
-			varying vec3 interpolatedColor;
-			
-			void main() {
-				interpolatedColor = vertexColor;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-			}
-		</script>
-	<script id="fragmentShader" type="x-shader/x-fragment">
-			varying vec3 interpolatedColor;
-			
-			void main() {
-				gl_FragColor = vec4(interpolatedColor, 1.0);
-			}
-		</script>
 </head>
 
 <body onload="onLoad()">
