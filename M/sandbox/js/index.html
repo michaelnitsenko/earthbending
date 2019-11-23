@@ -19,8 +19,8 @@
 		var mapHeight = 10;
 		var maxTerrainHeight = 100;
 
-		var terrain, terrainObj;
-		var obj;
+		var terrain;
+		var character;
 
 		var fov = 80;
 		var width = 800;
@@ -51,6 +51,7 @@
 			addCamera();
 			addLight();
 			addTerrain();
+			addCharacter();
 
 			draw();
 		}
@@ -104,9 +105,22 @@
 		}
 
 		function addLight() {
-			var light = new THREE.PointLight( 0xff0000, 1, 100 );
-			light.position.set( 50, 50, 50 );
-			scene.add( light );
+			var light = new THREE.DirectionalLight( 0xffffff, 0.5 );
+			light.position.set(0, 0, 1);
+			scene.add(light);
+		}
+
+		function addCharacter() {
+			character = createCharacter();
+			scene.add( character );
+		}
+
+		function createCharacter() {
+			var geometry = new THREE.BoxBufferGeometry( 1, 1, 1 );
+			var material = new THREE.MeshNormalMaterial();
+			var cube = new THREE.Mesh( geometry, material );
+			
+			return cube;
 		}
 
 		function addTerrain() {
@@ -114,6 +128,10 @@
 			var halfPi = Math.PI / 2;
 
 			terrain = createTerrain();
+			
+			var heightCenter = mapHeight / 2;
+			var widthCenter = mapWidth / 2;
+			terrainObj.position.set(-widthCenter, -heightCenter, 0);
 			terrainObj.add(terrain);
 
 			scene.add(terrainObj);
@@ -125,21 +143,17 @@
 			var vertices = [];
 			var faces = [];
 
-			var rowsCount = map.length;
-			var cellsCount = map[0].length;
-			var heightCenter = rowsCount / 2;
-			var widthCenter = cellsCount / 2;
-			for (var rowIndex = 0; rowIndex < rowsCount; rowIndex++) {
+			for (var rowIndex = 0; rowIndex < mapHeight; rowIndex++) {
 				var row = map[rowIndex];
-				for (var cellIndex = 0; cellIndex < cellsCount; cellIndex++) {
+				for (var cellIndex = 0; cellIndex < mapWidth; cellIndex++) {
 					var height = row[cellIndex];
-					vertices.push(cellIndex - widthCenter);
-					vertices.push(rowIndex - heightCenter);
-					vertices.push(height);
+					vertices.push(cellIndex);
+					vertices.push(rowIndex);
+					vertices.push(0);
 
-					if (rowIndex < rowsCount - 1 && cellIndex < cellsCount - 1) {
-						var index = rowIndex * cellsCount + cellIndex;
-						var index_upper = (rowIndex + 1) * cellsCount + cellIndex;
+					if (rowIndex < mapHeight - 1 && cellIndex < mapWidth - 1) {
+						var index = rowIndex * mapWidth + cellIndex;
+						var index_upper = index + mapWidth;
 
 						faces.push(index);
 						faces.push(index + 1);
@@ -152,7 +166,7 @@
 				}
 			}
 
-			var verticesCount = rowsCount * cellsCount * 3;
+			var verticesCount = mapWidth * mapHeight * 3;
 			for (i = 0; i < verticesCount; i += 3) {
 				geometry.vertices.push(new THREE.Vector3(
 					vertices[i],
@@ -163,32 +177,39 @@
 
 			var facesCount = faces.length;
 			for (i = 0; i < facesCount; i += 3) {
+				var v1 = faces[i];
+				var v2 = faces[i + 1];
+				var v3 = faces[i + 2];
 				var face = new THREE.Face3(
-					faces[i],
-					faces[i + 1],
-					faces[i + 2],
+					v1,
+					v2,
+					v3,
 				);
 
-				var height1 = vertices[i * 3  + 2];
+
+				var height1 = map[Math.floor(v1 / mapWidth)][v1 % mapWidth];
 				var grayScale1 = height1 / maxTerrainHeight;
-				face.vertexColors[0] = new THREE.Color(grayScale1, grayScale1, grayScale1);
-				var height2 = vertices[(i + 1) * 3  + 2];
+				//face.vertexColors[0] = new THREE.Color(grayScale1, grayScale1, grayScale1);
+
+				var height2 = map[Math.floor(v2 / mapWidth)][v2 % mapWidth];
 				var grayScale2 = height2 / maxTerrainHeight;
-				face.vertexColors[1] = new THREE.Color(grayScale2, grayScale2, grayScale2);
-				var height3 = vertices[(i + 2) * 3  + 2];
+				//face.vertexColors[1] = new THREE.Color(grayScale2, grayScale2, grayScale2);
+
+				var height3 = map[Math.floor(v3 / mapWidth)][v3 % mapWidth];
 				var grayScale3 = height3 / maxTerrainHeight;
-				face.vertexColors[2] = new THREE.Color(grayScale3, grayScale3, grayScale3);
+				//face.vertexColors[2] = new THREE.Color(grayScale3, grayScale3, grayScale3);
+
 				geometry.faces.push(face);
 			}
 
-			var material = new THREE.MeshBasicMaterial({ vertexColors: THREE.VertexColors });
+			var material = new THREE.MeshDepthMaterial({ vertexColors: THREE.VertexColors });
 			var terrainMesh = new THREE.Mesh(geometry, material);
 
 			return terrainMesh;
 		}
 
 		function chipTerrain(point) {
-
+			
 		}
 
 		function lowerTerrain(point) {
