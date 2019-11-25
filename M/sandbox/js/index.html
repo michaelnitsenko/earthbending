@@ -68,15 +68,44 @@
 			}
 		}
 
+		function getActionPoint() { // slightly before character
+			var actionPoint = new THREE.Vector3();
+			character.getWorldPosition(actionPoint);
+			var actionDirection = new THREE.Vector3();
+			character.getWorldDirection(actionDirection);
+			console.log(actionPoint)
+			actionPoint.add(actionDirection);
+
+			return actionPoint;
+		}
+
+		function xyDistance(point1, point2) {
+			return Math.pow(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2), 0.5)
+		}
+
+		function getTerrainVerticesInXYRadius(point, radius) {
+			var vertices = terrain.geometry.vertices;
+			var selectedVertices = [];
+
+			for (var vertexIndex in vertices) {
+				var vertex = vertices[vertexIndex];
+				if (xyDistance(vertex, point) < radius) {
+					selectedVertices.push(vertex);
+				}
+			}
+
+			return selectedVertices;
+		}
+
 		function parseControls(dt) {
 			if (keyboard.pressed("left")) {
-
+				chipTerrain(getActionPoint());
 			}
 			if (keyboard.pressed("up")) {
-				
+				raiseTerrain(getActionPoint());
 			}
 			if (keyboard.pressed("down")) {
-				
+				lowerTerrain(getActionPoint());
 			}
 		}
 
@@ -213,11 +242,23 @@
 		}
 
 		function lowerTerrain(point) {
-
+			var selectedVertices = getTerrainVerticesInXYRadius(point, 3);
+			
+			for (var vertexIndex in selectedVertices) {
+				var vertice = selectedVertices[vertexIndex];
+				vertice.z -= 0.1;
+				terrain.geometry.verticesNeedUpdate = true;
+			}
 		}
 
 		function raiseTerrain(point) {
-
+			var selectedVertices = getTerrainVerticesInXYRadius(point, 3);
+			
+			for (var vertexIndex in selectedVertices) {
+				var vertice = selectedVertices[vertexIndex];
+				vertice.z += 0.1;
+				terrain.geometry.verticesNeedUpdate = true;
+			}
 		}
 
 	</script>
