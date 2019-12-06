@@ -21,6 +21,7 @@
 
 		var terrain;
 		var character;
+		var actionRadius = 2;
 
 		var fov = 80;
 		var width = 800;
@@ -68,29 +69,34 @@
 			}
 		}
 
-		function getActionPoint() { // slightly before character
-			var actionPoint = new THREE.Vector3();
-			character.getWorldPosition(actionPoint);
-			var actionDirection = new THREE.Vector3();
-			character.getWorldDirection(actionDirection);
-			console.log(actionPoint)
-			actionPoint.add(actionDirection);
-
-			return actionPoint;
-		}
-
 		function xyDistance(point1, point2) {
 			return Math.pow(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2), 0.5)
 		}
 
+		function calculateActionPoint(radius) {
+			var actionPoint = new THREE.Vector3();
+			character.getWorldPosition(actionPoint);
+			var actionDirection = new THREE.Vector3();
+			character.getWorldDirection(actionDirection);
+			actionDirection.addScaledVector(actionDirection, radius + 1);
+			actionPoint.add(actionDirection);
+
+			return actionPoint
+		}
+
 		function getTerrainVerticesInXYRadius(point, radius) {
 			var vertices = terrain.geometry.vertices;
+			var terrainPosition = new THREE.Vector3();
+			terrain.getWorldPosition(terrainPosition);
+
 			var selectedVertices = [];
 
 			for (var vertexIndex in vertices) {
-				var vertex = vertices[vertexIndex];
+				var meshVertex = vertices[vertexIndex];
+				var vertex = new THREE.Vector3().copy(meshVertex);
+				vertex.add(terrainPosition);
 				if (xyDistance(vertex, point) < radius) {
-					selectedVertices.push(vertex);
+					selectedVertices.push(meshVertex);
 				}
 			}
 
@@ -99,13 +105,25 @@
 
 		function parseControls(dt) {
 			if (keyboard.pressed("left")) {
-				chipTerrain(getActionPoint());
+				chipTerrain(calculateActionPoint(actionRadius));
 			}
 			if (keyboard.pressed("up")) {
-				raiseTerrain(getActionPoint());
+				raiseTerrain(calculateActionPoint(actionRadius));
 			}
 			if (keyboard.pressed("down")) {
-				lowerTerrain(getActionPoint());
+				lowerTerrain(calculateActionPoint(actionRadius));
+			}
+			if (keyboard.pressed("w")) {
+				character.translateZ(0.1);
+			}
+			if (keyboard.pressed("s")) {
+				character.translateZ(-0.1);
+			}
+			if (keyboard.pressed("a")) {
+				character.rotateX(-0.1);
+			}
+			if (keyboard.pressed("d")) {
+				character.rotateX(0.1);
 			}
 		}
 
@@ -133,6 +151,19 @@
 			controls = new THREE.OrbitControls(camera);
 		}
 
+		function updateCameraPosition() {
+			var backward = new THREE.Vector3();
+			scene.getWorldDirection(backward);
+			console.log(backward)
+			backward.applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
+
+			var center = new THREE.Vector3().copy(character.position).add(new THREE.Vector3(0, 0, 0));
+			var cameraPositionOffset = new THREE.Vector3().copy(backward).multiply(new THREE.Vector3(3, 3, 3)).add(new THREE.Vector3(0, 0, 0));
+			var cameraPosition = new THREE.Vector3().copy(character.position).add(cameraPositionOffset);
+			camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+			camera.lookAt(center);
+		}
+
 		function addLight() {
 			var light = new THREE.DirectionalLight( 0xffffff, 0.5 );
 			light.position.set(0, 0, 1);
@@ -148,6 +179,7 @@
 			var geometry = new THREE.BoxBufferGeometry( 1, 1, 1 );
 			var material = new THREE.MeshNormalMaterial();
 			var cube = new THREE.Mesh( geometry, material );
+			cube.lookAt(1, 0, 0)
 			
 			return cube;
 		}
@@ -242,7 +274,7 @@
 		}
 
 		function lowerTerrain(point) {
-			var selectedVertices = getTerrainVerticesInXYRadius(point, 3);
+			var selectedVertices = getTerrainVerticesInXYRadius(point, actionRadius);
 			
 			for (var vertexIndex in selectedVertices) {
 				var vertice = selectedVertices[vertexIndex];
@@ -252,7 +284,7 @@
 		}
 
 		function raiseTerrain(point) {
-			var selectedVertices = getTerrainVerticesInXYRadius(point, 3);
+			var selectedVertices = getTerrainVerticesInXYRadius(point, actionRadius);
 			
 			for (var vertexIndex in selectedVertices) {
 				var vertice = selectedVertices[vertexIndex];
