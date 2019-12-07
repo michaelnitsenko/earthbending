@@ -5,13 +5,11 @@
 	<title>Earthbending</title>
 	<meta charset="UTF-8">
 	<script type="text/javascript" src="three.r108.js"></script>
-	<script type="text/javascript" src="OrbitControls.js"></script>
 	<script type="text/javascript" src="THREEx.KeyboardState.js"></script>
 	<script type="text/javascript">
 
 		var clock = new THREE.Clock();
 		var keyboard = new THREEx.KeyboardState();
-		var controls;
 
 		var renderer, scene, camera;
 		var map;
@@ -22,10 +20,12 @@
 		var terrain;
 		var character;
 		var actionRadius = 2;
+		var characterSpeed = 0;
+		var characterForward;
 
 		var fov = 80;
-		var width = 800;
-		var height = 500;
+		var width = 1600;
+		var height = 900;
 
 		var cubeVertexShader, cubeFragmentShader;
 
@@ -49,10 +49,11 @@
 			genMap();
 
 			scene = new THREE.Scene();
-			addCamera();
-			addLight();
 			addTerrain();
 			addCharacter();
+			addCamera();
+			var dt = clock.getDelta();
+			updateCharacter(dt);
 
 			draw();
 		}
@@ -69,22 +70,17 @@
 			}
 		}
 
-		function xyDistance(point1, point2) {
-			return Math.pow(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2), 0.5)
-		}
-
 		function calculateActionPoint(radius) {
 			var actionPoint = new THREE.Vector3();
 			character.getWorldPosition(actionPoint);
-			var actionDirection = new THREE.Vector3();
-			character.getWorldDirection(actionDirection);
+			var actionDirection = characterForward.clone();
 			actionDirection.addScaledVector(actionDirection, radius + 1);
 			actionPoint.add(actionDirection);
 
 			return actionPoint
 		}
 
-		function getTerrainVerticesInXYRadius(point, radius) {
+		function getTerrainVerticesInRadius(point, radius) {
 			var vertices = terrain.geometry.vertices;
 			var terrainPosition = new THREE.Vector3();
 			terrain.getWorldPosition(terrainPosition);
@@ -95,7 +91,7 @@
 				var meshVertex = vertices[vertexIndex];
 				var vertex = new THREE.Vector3().copy(meshVertex);
 				vertex.add(terrainPosition);
-				if (xyDistance(vertex, point) < radius) {
+				if (point.distanceTo(vertex) < radius) {
 					selectedVertices.push(meshVertex);
 				}
 			}
@@ -113,18 +109,45 @@
 			if (keyboard.pressed("down")) {
 				lowerTerrain(calculateActionPoint(actionRadius));
 			}
+
+			characterSpeed = 0;
 			if (keyboard.pressed("w")) {
-				character.translateZ(0.1);
+				characterSpeed = 3 * dt;
 			}
 			if (keyboard.pressed("s")) {
-				character.translateZ(-0.1);
+				characterSpeed = -3 * dt;
 			}
 			if (keyboard.pressed("a")) {
-				character.rotateX(-0.1);
+				character.rotation.set(0, character.rotation.y + toRad(60 * dt % 360), 0)
 			}
 			if (keyboard.pressed("d")) {
-				character.rotateX(0.1);
+				character.rotation.set(0, character.rotation.y - toRad(60 * dt % 360), 0)
 			}
+
+			updateCharacter(dt);
+		}
+
+		function updateCharacter(dt) {
+			characterForward = new THREE.Vector3(0, 0, -1);
+			characterForward.applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
+
+			var characterMovement = characterForward.clone().multiplyScalar(characterSpeed);
+			character.position.add(characterMovement);
+
+			updateCameraPosition();
+		}
+
+		function updateCameraPosition() {
+			var characterPosition = new THREE.Vector3();
+			character.getWorldPosition(characterPosition);
+			
+			var characterBackward = characterForward.clone().multiply(new THREE.Vector3(-1, -1, -1));
+
+			var cameraOffset = characterBackward.clone().multiply(new THREE.Vector3(3, 3, 3)).add(new THREE.Vector3(0, 2, 0));
+			var cameraPosition = characterPosition.clone().add(cameraOffset);
+			camera.position.copy(cameraPosition);
+			camera.up = new THREE.Vector3(0, 1, 0);
+			camera.lookAt(characterPosition);
 		}
 
 		function draw() {
@@ -133,7 +156,6 @@
 
 			requestAnimationFrame(draw);
 			parseControls(dt);
-			controls.update();
 
 			renderer.setViewport(0, 0, width, height);
 			renderer.setScissorTest(false);
@@ -143,44 +165,19 @@
 
 		function addCamera() {
 			camera = new THREE.PerspectiveCamera(fov, width / height, 1, 1000);
-			camera.position.z = 10;
-			camera.up = new THREE.Vector3(0, 1, 0);
-			camera.lookAt(new THREE.Vector3(0, 0, 0));
 			scene.add(camera);
-
-			controls = new THREE.OrbitControls(camera);
-		}
-
-		function updateCameraPosition() {
-			var backward = new THREE.Vector3();
-			scene.getWorldDirection(backward);
-			console.log(backward)
-			backward.applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
-
-			var center = new THREE.Vector3().copy(character.position).add(new THREE.Vector3(0, 0, 0));
-			var cameraPositionOffset = new THREE.Vector3().copy(backward).multiply(new THREE.Vector3(3, 3, 3)).add(new THREE.Vector3(0, 0, 0));
-			var cameraPosition = new THREE.Vector3().copy(character.position).add(cameraPositionOffset);
-			camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
-			camera.lookAt(center);
-		}
-
-		function addLight() {
-			var light = new THREE.DirectionalLight( 0xffffff, 0.5 );
-			light.position.set(0, 0, 1);
-			scene.add(light);
 		}
 
 		function addCharacter() {
 			character = createCharacter();
-			scene.add( character );
+			scene.add(character);
 		}
 
 		function createCharacter() {
-			var geometry = new THREE.BoxBufferGeometry( 1, 1, 1 );
+			var geometry = new THREE.BoxBufferGeometry(1, 1, 1);
 			var material = new THREE.MeshNormalMaterial();
-			var cube = new THREE.Mesh( geometry, material );
-			cube.lookAt(1, 0, 0)
-			
+			var cube = new THREE.Mesh(geometry, material);
+
 			return cube;
 		}
 
@@ -189,10 +186,10 @@
 			var halfPi = Math.PI / 2;
 
 			terrain = createTerrain();
-			
+
 			var heightCenter = mapHeight / 2;
 			var widthCenter = mapWidth / 2;
-			terrainObj.position.set(-widthCenter, -heightCenter, 0);
+			terrainObj.position.set(-widthCenter, 0, -heightCenter);
 			terrainObj.add(terrain);
 
 			scene.add(terrainObj);
@@ -209,20 +206,20 @@
 				for (var cellIndex = 0; cellIndex < mapWidth; cellIndex++) {
 					var height = row[cellIndex];
 					vertices.push(cellIndex);
-					vertices.push(rowIndex);
 					vertices.push(0);
+					vertices.push(rowIndex);
 
 					if (rowIndex < mapHeight - 1 && cellIndex < mapWidth - 1) {
 						var index = rowIndex * mapWidth + cellIndex;
 						var index_upper = index + mapWidth;
 
 						faces.push(index);
-						faces.push(index + 1);
 						faces.push(index_upper);
+						faces.push(index + 1);
 
 						faces.push(index + 1);
-						faces.push(index_upper + 1);
 						faces.push(index_upper - 1 + 1);
+						faces.push(index_upper + 1);
 					}
 				}
 			}
@@ -270,25 +267,25 @@
 		}
 
 		function chipTerrain(point) {
-			
+
 		}
 
 		function lowerTerrain(point) {
-			var selectedVertices = getTerrainVerticesInXYRadius(point, actionRadius);
-			
+			var selectedVertices = getTerrainVerticesInRadius(point, actionRadius);
+
 			for (var vertexIndex in selectedVertices) {
 				var vertice = selectedVertices[vertexIndex];
-				vertice.z -= 0.1;
+				vertice.y -= 0.1;
 				terrain.geometry.verticesNeedUpdate = true;
 			}
 		}
 
 		function raiseTerrain(point) {
-			var selectedVertices = getTerrainVerticesInXYRadius(point, actionRadius);
-			
+			var selectedVertices = getTerrainVerticesInRadius(point, actionRadius);
+
 			for (var vertexIndex in selectedVertices) {
 				var vertice = selectedVertices[vertexIndex];
-				vertice.z += 0.1;
+				vertice.y += 0.1;
 				terrain.geometry.verticesNeedUpdate = true;
 			}
 		}
