@@ -100,7 +100,7 @@
 		}
 
 		function parseControls(dt) {
-			if (keyboard.pressed("left")) {
+			if (keyboard.pressed("space")) {
 				chipTerrain(calculateActionPoint(actionRadius));
 			}
 			if (keyboard.pressed("up")) {
@@ -112,10 +112,10 @@
 
 			characterSpeed = 0;
 			if (keyboard.pressed("w")) {
-				characterSpeed = 3 * dt;
+				characterSpeed = 5 * dt;
 			}
 			if (keyboard.pressed("s")) {
-				characterSpeed = -3 * dt;
+				characterSpeed = -5 * dt;
 			}
 			if (keyboard.pressed("a")) {
 				character.rotation.set(0, character.rotation.y + toRad(60 * dt % 360), 0)
@@ -244,19 +244,6 @@
 					v3,
 				);
 
-
-				var height1 = map[Math.floor(v1 / mapWidth)][v1 % mapWidth];
-				var grayScale1 = height1 / maxTerrainHeight;
-				//face.vertexColors[0] = new THREE.Color(grayScale1, grayScale1, grayScale1);
-
-				var height2 = map[Math.floor(v2 / mapWidth)][v2 % mapWidth];
-				var grayScale2 = height2 / maxTerrainHeight;
-				//face.vertexColors[1] = new THREE.Color(grayScale2, grayScale2, grayScale2);
-
-				var height3 = map[Math.floor(v3 / mapWidth)][v3 % mapWidth];
-				var grayScale3 = height3 / maxTerrainHeight;
-				//face.vertexColors[2] = new THREE.Color(grayScale3, grayScale3, grayScale3);
-
 				geometry.faces.push(face);
 			}
 
@@ -267,27 +254,64 @@
 		}
 
 		function chipTerrain(point) {
+			var selectedVertices = getTerrainVerticesInRadius(point, actionRadius);
 
+			var geometry = new THREE.Geometry();
+			var topVertices = [];
+			var bottomVertices = [];
+			var face = [];
+			
+			var rockHeight = 1;
+			for (var vertexIndex in selectedVertices) {
+				var vertex = selectedVertices[vertexIndex];
+				var bottomY = vertex.y - rockHeight;
+				vertex.y = bottomY;
+
+				var topVertex = vertice.clone();
+				var bottomVertex = vertice.clone();
+				bottomVertex.y = bottomY;
+
+				topVertices.push(topVertex);
+				bottomVertices.push(bottomVertex);
+			}
+
+			terrain.geometry.verticesNeedUpdate = true;
+
+			// var facesCount = faces.length;
+			// for (i = 0; i < facesCount; i += 3) {
+			// 	var v1 = faces[i];
+			// 	var v2 = faces[i + 1];
+			// 	var v3 = faces[i + 2];
+			// 	var face = new THREE.Face3(
+			// 		v1,
+			// 		v2,
+			// 		v3,
+			// 	);
+
+			// 	geometry.faces.push(face);
+			// }
 		}
 
 		function lowerTerrain(point) {
 			var selectedVertices = getTerrainVerticesInRadius(point, actionRadius);
 
 			for (var vertexIndex in selectedVertices) {
-				var vertice = selectedVertices[vertexIndex];
-				vertice.y -= 0.1;
-				terrain.geometry.verticesNeedUpdate = true;
+				var vertex = selectedVertices[vertexIndex];
+				vertex.y -= 0.1;
 			}
+
+			terrain.geometry.verticesNeedUpdate = true;
 		}
 
 		function raiseTerrain(point) {
 			var selectedVertices = getTerrainVerticesInRadius(point, actionRadius);
 
 			for (var vertexIndex in selectedVertices) {
-				var vertice = selectedVertices[vertexIndex];
-				vertice.y += 0.1;
-				terrain.geometry.verticesNeedUpdate = true;
+				var vertex = selectedVertices[vertexIndex];
+				vertex.y += 0.1;
 			}
+
+			terrain.geometry.verticesNeedUpdate = true;
 		}
 
 	</script>
