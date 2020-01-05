@@ -1,6 +1,5 @@
 # Procedural Earthbending
-Computer Graphics (MTAT.03.015)
-University of Tartu
+University of Tartu, Computer Graphics (MTAT.03.015)
 
 ## Info
 
